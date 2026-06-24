@@ -42,3 +42,14 @@ gh run watch
 
 Previously published package versions are never deleted — each run adds new
 package files alongside existing ones and re-indexes the channel.
+
+## Testing an install
+
+`test-environment.yml` defines a throwaway environment pulling
+`breseq-prerelease` from this channel:
+
+```
+conda env create -f test-environment.yml
+conda activate breseq-prerelease-test
+breseq --help
+```

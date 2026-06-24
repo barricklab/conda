@@ -1,0 +1,7 @@
+name: breseq-prerelease-test
+channels:
+  - https://barricklab.github.io/conda/
+  - conda-forge
+  - bioconda
+dependencies:
+  - breseq-prerelease
