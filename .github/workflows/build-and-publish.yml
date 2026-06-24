@@ -38,11 +38,11 @@ jobs:
           miniforge-version: latest
           channels: conda-forge,bioconda
           channel-priority: strict
-          activate-environment: build-env
+          auto-activate-base: true
 
       - name: Install conda-build
         shell: bash -el {0}
-        run: conda install -y conda-build conda-index
+        run: conda install -y -n base conda-build conda-index
 
       - name: Build breseq-prerelease (${{ matrix.subdir }})
         shell: bash -el {0}
