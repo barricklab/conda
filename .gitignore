@@ -1,0 +1,5 @@
+.DS_Store
+built-pkgs/
+downloaded-pkgs/
+local-built/
+channel/

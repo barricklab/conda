@@ -1,0 +1,129 @@
+name: Build and publish breseq-prerelease
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      has_new_commit: ${{ steps.check.outputs.has_new_commit }}
+      remote_sha: ${{ steps.check.outputs.remote_sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for new breseq commit
+        id: check
+        run: bash scripts/check_new_commit.sh
+
+  build:
+    needs: check
+    if: needs.check.outputs.has_new_commit == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            subdir: linux-64
+          - os: macos-14
+            subdir: osx-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          channels: conda-forge,bioconda
+          channel-priority: strict
+          activate-environment: build-env
+
+      - name: Install conda-build
+        shell: bash -el {0}
+        run: conda install -y conda-build conda-index
+
+      - name: Build breseq-prerelease (${{ matrix.subdir }})
+        shell: bash -el {0}
+        env:
+          BRESEQ_COMMIT_SHA: ${{ needs.check.outputs.remote_sha }}
+        run: |
+          conda build recipe/breseq-prerelease \
+            -c conda-forge -c bioconda \
+            --output-folder ./built-pkgs
+
+      - name: Upload built package
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.subdir }}
+          path: built-pkgs/${{ matrix.subdir }}/*.conda
+          if-no-files-found: error
+
+  publish:
+    needs: [check, build]
+    if: needs.check.outputs.has_new_commit == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pkg-*
+          path: downloaded-pkgs
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          channels: conda-forge
+          activate-environment: index-env
+
+      - name: Install conda-index
+        shell: bash -el {0}
+        run: conda install -y conda-index
+
+      - name: Checkout gh-pages into ./channel
+        run: |
+          git fetch origin gh-pages || true
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add channel gh-pages
+          else
+            mkdir -p channel
+            git -C channel init -q
+            git -C channel checkout -q --orphan gh-pages
+          fi
+
+      - name: Merge new packages into channel (without deleting existing)
+        shell: bash -el {0}
+        run: bash scripts/publish_channel.sh
+
+      - name: conda index
+        shell: bash -el {0}
+        run: python -m conda_index channel/
+
+      - name: Commit and push gh-pages
+        working-directory: channel
+        run: |
+          touch .nojekyll
+          git add -A
+          git -c user.name="breseq-prerelease-bot" \
+              -c user.email="actions@github.com" \
+              commit -m "Publish breseq-prerelease for ${{ needs.check.outputs.remote_sha }}"
+          git push origin gh-pages
+
+      - name: Update state file on main
+        run: |
+          cat > state/last-published-commit.json <<EOF
+          {
+            "breseq_commit_sha": "${{ needs.check.outputs.remote_sha }}",
+            "published_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+          git add state/last-published-commit.json
+          git -c user.name="breseq-prerelease-bot" \
+              -c user.email="actions@github.com" \
+              commit -m "Update last-published-commit state [skip ci]"
+          git push origin HEAD:main
