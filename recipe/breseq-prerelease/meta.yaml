@@ -1,7 +1,7 @@
-{% set raw_tag = GIT_DESCRIBE_TAG %}
+{% set raw_tag = GIT_DESCRIBE_TAG if GIT_DESCRIBE_TAG else "v0.0.0" %}
 {% set tag_stripped = raw_tag[1:] if raw_tag.startswith("v") else raw_tag %}
-{% set dev_count = GIT_DESCRIBE_NUMBER | default("0") %}
-{% set short_hash = GIT_DESCRIBE_HASH | default("") %}
+{% set dev_count = GIT_DESCRIBE_NUMBER | default("0", true) %}
+{% set short_hash = GIT_DESCRIBE_HASH | default("", true) %}
 {% set version = tag_stripped if dev_count == "0" else tag_stripped ~ ".dev" ~ dev_count ~ "+" ~ short_hash %}
 
 package:
@@ -15,7 +15,7 @@ source:
 
 build:
   number: 0
-  string: {{ GIT_DESCRIBE_HASH | default("local") }}
+  string: {{ short_hash if short_hash else "local" }}
   script_env:
     - BRESEQ_COMMIT_SHA
 
