@@ -2,6 +2,8 @@ name: Build and publish breseq-prerelease
 
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: '13 10 * * *'
 
 permissions:
   contents: write
