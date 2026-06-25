@@ -23,8 +23,8 @@ analysis.
 - `.github/workflows/build-and-publish.yml` runs daily at 7:13 UTC (~3:13am
   US Eastern) and can also be triggered manually (`workflow_dispatch`): it
   checks whether breseq has a new commit since the last publish
-  (`scripts/check_new_commit.sh`), and if so builds packages for Linux and
-  macOS (Apple Silicon) and publishes them into the channel
+  (`scripts/check_new_commit.sh`), and if so builds packages for linux-64,
+  linux-aarch64, osx-arm64, and osx-64, and publishes them into the channel
   (`scripts/publish_channel.sh` + `conda index`) hosted on the `gh-pages`
   branch.
 - `state/last-published-commit.json` (on `main`) records the last breseq
