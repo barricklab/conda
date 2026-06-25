@@ -7,9 +7,12 @@ LAST_SHA=$(jq -r '.breseq_commit_sha // ""' state/last-published-commit.json 2>/
 echo "remote_sha=${REMOTE_SHA}" >> "$GITHUB_OUTPUT"
 echo "last_sha=${LAST_SHA}" >> "$GITHUB_OUTPUT"
 
-if [[ "${REMOTE_SHA}" == "${LAST_SHA}" ]]; then
+if [[ "${REMOTE_SHA}" == "${LAST_SHA}" && "${FORCE_BUILD:-false}" != "true" ]]; then
   echo "has_new_commit=false" >> "$GITHUB_OUTPUT"
   echo "No new commit on barricklab/breseq (still at ${REMOTE_SHA})."
+elif [[ "${REMOTE_SHA}" == "${LAST_SHA}" ]]; then
+  echo "has_new_commit=true" >> "$GITHUB_OUTPUT"
+  echo "Forcing build despite no new commit (still at ${REMOTE_SHA})."
 else
   echo "has_new_commit=true" >> "$GITHUB_OUTPUT"
   echo "New commit on barricklab/breseq: ${LAST_SHA:-<none>} -> ${REMOTE_SHA}"
