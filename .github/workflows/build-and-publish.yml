@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -20,7 +24,7 @@ jobs:
       has_new_commit: ${{ steps.check.outputs.has_new_commit }}
       remote_sha: ${{ steps.check.outputs.remote_sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check for new breseq commit
         id: check
         env:
@@ -44,9 +48,9 @@ jobs:
             subdir: osx-64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: conda-incubator/setup-miniconda@v3
+      - uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest
           channels: conda-forge,bioconda
@@ -67,7 +71,7 @@ jobs:
             --output-folder ./built-pkgs
 
       - name: Upload built package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pkg-${{ matrix.subdir }}
           path: built-pkgs/${{ matrix.subdir }}/*.conda
@@ -78,16 +82,16 @@ jobs:
     if: needs.check.outputs.has_new_commit == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: pkg-*
           path: downloaded-pkgs
 
-      - uses: conda-incubator/setup-miniconda@v3
+      - uses: conda-incubator/setup-miniconda@v4
         with:
           miniforge-version: latest
           channels: conda-forge
@@ -128,6 +132,8 @@ jobs:
 
       - name: Update state file on main
         run: |
+          git fetch origin main
+          git reset --hard origin/main
           cat > state/last-published-commit.json <<EOF
           {
             "breseq_commit_sha": "${{ needs.check.outputs.remote_sha }}",
