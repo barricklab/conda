@@ -20,7 +20,7 @@ analysis.
 - `recipe/breseq-prerelease/` is a conda-build recipe that builds breseq from
   a git checkout (`source.git_url`) rather than a release tarball, and derives
   a PEP440 dev version from `git describe` (e.g. `0.40.1.dev42+g3a91c4`).
-- `.github/workflows/build-and-publish.yml` runs daily at 10:13 UTC (~6:13am
+- `.github/workflows/build-and-publish.yml` runs daily at 7:13 UTC (~3:13am
   US Eastern) and can also be triggered manually (`workflow_dispatch`): it
   checks whether breseq has a new commit since the last publish
   (`scripts/check_new_commit.sh`), and if so builds packages for Linux and
