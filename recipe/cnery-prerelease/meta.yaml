@@ -5,7 +5,7 @@
 {% set version = tag_stripped if dev_count == "0" else tag_stripped ~ ".dev" ~ dev_count ~ "+" ~ short_hash %}
 
 package:
-  name: CNery-prerelease
+  name: cnery-prerelease
   version: {{ version }}
 
 source:

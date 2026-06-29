@@ -114,7 +114,7 @@ jobs:
         env:
           CNERY_COMMIT_SHA: ${{ needs.check-cnery.outputs.remote_sha }}
         run: |
-          conda build recipe/CNery-prerelease \
+          conda build recipe/cnery-prerelease \
             -c conda-forge -c bioconda \
             --output-folder ./built-pkgs
 
