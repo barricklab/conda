@@ -1,0 +1,46 @@
+{% set raw_tag = GIT_DESCRIBE_TAG if GIT_DESCRIBE_TAG else "v0.0.0" %}
+{% set tag_stripped = raw_tag[1:] if raw_tag.startswith("v") else raw_tag %}
+{% set dev_count = GIT_DESCRIBE_NUMBER | default("0", true) %}
+{% set short_hash = GIT_DESCRIBE_HASH | default("", true) %}
+{% set version = tag_stripped if dev_count == "0" else tag_stripped ~ ".dev" ~ dev_count ~ "+" ~ short_hash %}
+
+package:
+  name: CNery-prerelease
+  version: {{ version }}
+
+source:
+  git_url: https://github.com/barricklab/CNery.git
+  git_rev: {{ environ.get("CNERY_COMMIT_SHA", "HEAD") }}
+  git_depth: -1
+
+build:
+  number: 0
+  string: {{ short_hash if short_hash else "local" }}
+  noarch: python
+  script: {{ PYTHON }} -m pip install --no-deps --no-build-isolation -v .
+  script_env:
+    - CNERY_COMMIT_SHA
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools >=68.2.0
+  run:
+    - python >=3.9
+    - pandas >=2.2.0,<3
+    - numpy >=1.26.0
+    - matplotlib >=3.8.0
+    - statsmodels >=0.14.0
+    - scipy >=1.12.0
+    - seaborn >=0.13.0
+
+test:
+  commands:
+    - CNery --help
+
+about:
+  home: https://github.com/barricklab/CNery
+  license: MIT
+  license_family: MIT
+  summary: "Automated pre-release build of CNery tracking barricklab/CNery's main branch (not for production use)."
