@@ -39,6 +39,7 @@ requirements:
     - bowtie2 2.5.5.*
     - gnuplot 6.0.4.*
     - phylip 3.697.*
+    - cnery-prerelease
 
 test:
   commands:

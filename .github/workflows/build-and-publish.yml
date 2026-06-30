@@ -1,10 +1,10 @@
-name: Build and publish breseq-prerelease
+name: Build and publish breseq-prerelease and CNery-prerelease
 
 on:
   workflow_dispatch:
     inputs:
       force:
-        description: 'Force a build even if there is no new breseq commit'
+        description: 'Force a build even if there are no new commits'
         type: boolean
         default: false
   schedule:
@@ -30,6 +30,19 @@ jobs:
         env:
           FORCE_BUILD: ${{ github.event.inputs.force }}
         run: bash scripts/check_new_commit.sh
+
+  check-cnery:
+    runs-on: ubuntu-latest
+    outputs:
+      has_new_commit: ${{ steps.check.outputs.has_new_commit }}
+      remote_sha: ${{ steps.check.outputs.remote_sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check for new CNery commit
+        id: check
+        env:
+          FORCE_BUILD: ${{ github.event.inputs.force }}
+        run: bash scripts/check_cnery_commit.sh
 
   build:
     needs: check
@@ -67,6 +80,7 @@ jobs:
           BRESEQ_COMMIT_SHA: ${{ needs.check.outputs.remote_sha }}
         run: |
           conda build recipe/breseq-prerelease \
+            -c https://barricklab.github.io/conda/ \
             -c conda-forge -c bioconda \
             --output-folder ./built-pkgs
 
@@ -77,9 +91,47 @@ jobs:
           path: built-pkgs/${{ matrix.subdir }}/*.conda
           if-no-files-found: error
 
+  build-cnery:
+    needs: check-cnery
+    if: needs.check-cnery.outputs.has_new_commit == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          channels: conda-forge,bioconda
+          channel-priority: strict
+          auto-activate-base: true
+
+      - name: Install conda-build
+        shell: bash -el {0}
+        run: conda install -y -n base conda-build conda-index
+
+      - name: Build CNery-prerelease (noarch)
+        shell: bash -el {0}
+        env:
+          CNERY_COMMIT_SHA: ${{ needs.check-cnery.outputs.remote_sha }}
+        run: |
+          conda build recipe/cnery-prerelease \
+            -c conda-forge -c bioconda \
+            --output-folder ./built-pkgs
+
+      - name: Upload built package
+        uses: actions/upload-artifact@v7
+        with:
+          name: pkg-noarch
+          path: built-pkgs/noarch/*.conda
+          if-no-files-found: error
+
   publish:
-    needs: [check, build]
-    if: needs.check.outputs.has_new_commit == 'true'
+    needs: [check, check-cnery, build, build-cnery]
+    if: |
+      always() &&
+      (needs.check.outputs.has_new_commit == 'true' || needs.check-cnery.outputs.has_new_commit == 'true') &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
+      (needs.build-cnery.result == 'success' || needs.build-cnery.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -127,21 +179,32 @@ jobs:
           git add -A
           git -c user.name="breseq-prerelease-bot" \
               -c user.email="actions@github.com" \
-              commit -m "Publish breseq-prerelease for ${{ needs.check.outputs.remote_sha }}"
+              commit -m "Publish packages: breseq=${{ needs.check.outputs.remote_sha }} CNery=${{ needs.check-cnery.outputs.remote_sha }}"
           git push origin gh-pages
 
-      - name: Update state file on main
+      - name: Update state files on main
         run: |
           git fetch origin main
           git reset --hard origin/main
-          cat > state/last-published-commit.json <<EOF
+          if [[ "${{ needs.check.outputs.has_new_commit }}" == "true" ]]; then
+            cat > state/last-published-commit.json <<EOF
           {
             "breseq_commit_sha": "${{ needs.check.outputs.remote_sha }}",
             "published_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "workflow_run_id": "${{ github.run_id }}"
           }
           EOF
-          git add state/last-published-commit.json
+          fi
+          if [[ "${{ needs.check-cnery.outputs.has_new_commit }}" == "true" ]]; then
+            cat > state/last-published-cnery-commit.json <<EOF
+          {
+            "cnery_commit_sha": "${{ needs.check-cnery.outputs.remote_sha }}",
+            "published_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "workflow_run_id": "${{ github.run_id }}"
+          }
+          EOF
+          fi
+          git add state/
           git -c user.name="breseq-prerelease-bot" \
               -c user.email="actions@github.com" \
               commit -m "Update last-published-commit state [skip ci]"
