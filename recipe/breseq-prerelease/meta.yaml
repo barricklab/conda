@@ -32,7 +32,6 @@ requirements:
     - make
   host:
     - __glibc >=2.17  # [linux]
-    - libdl  # [linux]
     - zlib 1.3.2.*
     - miniz 3.1.1.*
     - htslib >=1.10
