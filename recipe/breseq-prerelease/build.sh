@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ "$(uname)" == "Linux" ]] && export LDFLAGS="${LDFLAGS} -ldl"
+if [[ "$(uname)" == "Linux" ]]; then
+  export LIBS="${LIBS} -ldl"
+fi
 
 export INCLUDES="-I${PREFIX}/include"
 export LIBPATH="-L${PREFIX}/lib"
