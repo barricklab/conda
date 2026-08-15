@@ -23,6 +23,8 @@ jobs:
     outputs:
       has_new_commit: ${{ steps.check.outputs.has_new_commit }}
       remote_sha: ${{ steps.check.outputs.remote_sha }}
+      version: ${{ steps.check.outputs.version }}
+      build_string: ${{ steps.check.outputs.build_string }}
     steps:
       - uses: actions/checkout@v7
       - name: Check for new breseq commit
@@ -36,6 +38,8 @@ jobs:
     outputs:
       has_new_commit: ${{ steps.check.outputs.has_new_commit }}
       remote_sha: ${{ steps.check.outputs.remote_sha }}
+      version: ${{ steps.check.outputs.version }}
+      build_string: ${{ steps.check.outputs.build_string }}
     steps:
       - uses: actions/checkout@v7
       - name: Check for new CNery commit
@@ -78,6 +82,8 @@ jobs:
         shell: bash -el {0}
         env:
           BRESEQ_COMMIT_SHA: ${{ needs.check.outputs.remote_sha }}
+          BRESEQ_VERSION: ${{ needs.check.outputs.version }}
+          BRESEQ_BUILD_STRING: ${{ needs.check.outputs.build_string }}
         run: |
           conda build recipe/breseq-prerelease \
             -c https://barricklab.github.io/conda/ \
@@ -113,6 +119,8 @@ jobs:
         shell: bash -el {0}
         env:
           CNERY_COMMIT_SHA: ${{ needs.check-cnery.outputs.remote_sha }}
+          CNERY_VERSION: ${{ needs.check-cnery.outputs.version }}
+          CNERY_BUILD_STRING: ${{ needs.check-cnery.outputs.build_string }}
         run: |
           conda build recipe/cnery-prerelease \
             -c conda-forge -c bioconda \

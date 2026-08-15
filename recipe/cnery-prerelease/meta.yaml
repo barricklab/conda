@@ -1,8 +1,6 @@
-{% set raw_tag = environ.get("GIT_DESCRIBE_TAG", "v0.0.0") %}
-{% set tag_stripped = raw_tag[1:] if raw_tag.startswith("v") else raw_tag %}
-{% set dev_count = environ.get("GIT_DESCRIBE_NUMBER", "0") %}
-{% set short_hash = environ.get("GIT_DESCRIBE_HASH", "") %}
-{% set version = tag_stripped if dev_count == "0" else tag_stripped ~ ".dev" ~ dev_count ~ "+" ~ short_hash %}
+{# Both set by CI from scripts/derive_version.sh; the defaults are for local builds only. #}
+{% set version = environ.get("CNERY_VERSION", "0.0.0.dev0+local") %}
+{% set build_string = environ.get("CNERY_BUILD_STRING", "local") %}
 
 package:
   name: cnery-prerelease
@@ -15,7 +13,7 @@ source:
 
 build:
   number: 0
-  string: {{ short_hash if short_hash else "local" }}
+  string: {{ build_string }}
   noarch: python
   script: {{ PYTHON }} -m pip install --no-deps --no-build-isolation -v .
   script_env:
