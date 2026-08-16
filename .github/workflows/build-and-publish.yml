@@ -146,10 +146,39 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Download each artifact by name into an explicit directory. A `pattern:`
+      # download only creates per-artifact subdirectories when *several*
+      # artifacts match, so a CNery-only run used to land the package flat in
+      # downloaded-pkgs/ where publish_channel.sh could not see it.
       - uses: actions/download-artifact@v7
+        if: needs.build.result == 'success'
         with:
-          pattern: pkg-*
-          path: downloaded-pkgs
+          name: pkg-linux-64
+          path: downloaded-pkgs/pkg-linux-64
+
+      - uses: actions/download-artifact@v7
+        if: needs.build.result == 'success'
+        with:
+          name: pkg-linux-aarch64
+          path: downloaded-pkgs/pkg-linux-aarch64
+
+      - uses: actions/download-artifact@v7
+        if: needs.build.result == 'success'
+        with:
+          name: pkg-osx-arm64
+          path: downloaded-pkgs/pkg-osx-arm64
+
+      - uses: actions/download-artifact@v7
+        if: needs.build.result == 'success'
+        with:
+          name: pkg-osx-64
+          path: downloaded-pkgs/pkg-osx-64
+
+      - uses: actions/download-artifact@v7
+        if: needs.build-cnery.result == 'success'
+        with:
+          name: pkg-noarch
+          path: downloaded-pkgs/pkg-noarch
 
       - uses: conda-incubator/setup-miniconda@v4
         with:
@@ -175,6 +204,17 @@ jobs:
       - name: Merge new packages into channel (without deleting existing)
         shell: bash -el {0}
         run: bash scripts/publish_channel.sh
+
+      - name: Verify expected packages landed in channel
+        shell: bash -el {0}
+        env:
+          BRESEQ_BUILT: ${{ needs.build.result == 'success' }}
+          BRESEQ_VERSION: ${{ needs.check.outputs.version }}
+          BRESEQ_BUILD_STRING: ${{ needs.check.outputs.build_string }}
+          CNERY_BUILT: ${{ needs.build-cnery.result == 'success' }}
+          CNERY_VERSION: ${{ needs.check-cnery.outputs.version }}
+          CNERY_BUILD_STRING: ${{ needs.check-cnery.outputs.build_string }}
+        run: bash scripts/verify_channel.sh
 
       - name: conda index
         shell: bash -el {0}
