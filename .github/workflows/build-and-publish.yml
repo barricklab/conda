@@ -90,11 +90,15 @@ jobs:
             -c conda-forge -c bioconda \
             --output-folder ./built-pkgs
 
+      # The wildcard directory component is deliberate: upload-artifact preserves
+      # the path hierarchy after the first wildcard, so each package travels
+      # inside a <subdir>/ folder. That is what tells publish_channel.sh where a
+      # package belongs, so no list of platforms has to be repeated downstream.
       - name: Upload built package
         uses: actions/upload-artifact@v7
         with:
           name: pkg-${{ matrix.subdir }}
-          path: built-pkgs/${{ matrix.subdir }}/*.conda
+          path: built-pkgs/*/*.conda
           if-no-files-found: error
 
   build-cnery:
@@ -126,11 +130,12 @@ jobs:
             -c conda-forge -c bioconda \
             --output-folder ./built-pkgs
 
+      # Wildcard directory component: see the note on the breseq upload above.
       - name: Upload built package
         uses: actions/upload-artifact@v7
         with:
           name: pkg-noarch
-          path: built-pkgs/noarch/*.conda
+          path: built-pkgs/*/*.conda
           if-no-files-found: error
 
   publish:
@@ -146,39 +151,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Download each artifact by name into an explicit directory. A `pattern:`
-      # download only creates per-artifact subdirectories when *several*
-      # artifacts match, so a CNery-only run used to land the package flat in
-      # downloaded-pkgs/ where publish_channel.sh could not see it.
+      # download-artifact only creates per-artifact directories when *several*
+      # artifacts match a pattern, so this layout is either
+      # downloaded-pkgs/pkg-<subdir>/<subdir>/*.conda or, for a single match,
+      # downloaded-pkgs/<subdir>/*.conda. Either way each package sits in a
+      # folder named for its subdir, which is what the scripts below read.
       - uses: actions/download-artifact@v7
-        if: needs.build.result == 'success'
         with:
-          name: pkg-linux-64
-          path: downloaded-pkgs/pkg-linux-64
-
-      - uses: actions/download-artifact@v7
-        if: needs.build.result == 'success'
-        with:
-          name: pkg-linux-aarch64
-          path: downloaded-pkgs/pkg-linux-aarch64
-
-      - uses: actions/download-artifact@v7
-        if: needs.build.result == 'success'
-        with:
-          name: pkg-osx-arm64
-          path: downloaded-pkgs/pkg-osx-arm64
-
-      - uses: actions/download-artifact@v7
-        if: needs.build.result == 'success'
-        with:
-          name: pkg-osx-64
-          path: downloaded-pkgs/pkg-osx-64
-
-      - uses: actions/download-artifact@v7
-        if: needs.build-cnery.result == 'success'
-        with:
-          name: pkg-noarch
-          path: downloaded-pkgs/pkg-noarch
+          pattern: pkg-*
+          path: downloaded-pkgs
 
       - uses: conda-incubator/setup-miniconda@v4
         with:
