@@ -45,11 +45,17 @@ while IFS=$'\t' read -r subdir pkg; do
     fi
   fi
 
+  # The CNery recipe appends its own build number to the build string
+  # (g<sha8>_<n>), so that a recipe-only change can be republished at an
+  # unchanged upstream commit. The check job does not know that number, so
+  # match the suffix rather than demanding an exact filename; the version and
+  # the sha-derived stem, which are what an env-var regression would corrupt,
+  # are still pinned exactly.
   if [[ "${CNERY_BUILT:-false}" == "true" && "${name}" == cnery-prerelease-* ]]; then
-    if [[ "${name}" == "cnery-prerelease-${CNERY_VERSION}-${CNERY_BUILD_STRING}.conda" ]]; then
+    if [[ "${name}" == "cnery-prerelease-${CNERY_VERSION}-${CNERY_BUILD_STRING}_"*.conda ]]; then
       cnery_found=$((cnery_found + 1))
     else
-      echo "UNEXPECTED VERSION: ${name} (wanted cnery-prerelease-${CNERY_VERSION}-${CNERY_BUILD_STRING}.conda)" >&2
+      echo "UNEXPECTED VERSION: ${name} (wanted cnery-prerelease-${CNERY_VERSION}-${CNERY_BUILD_STRING}_<n>.conda)" >&2
       exit 1
     fi
   fi

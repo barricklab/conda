@@ -1,6 +1,11 @@
 {# Both set by CI from scripts/derive_version.sh; the defaults are for local builds only. #}
 {% set version = environ.get("CNERY_VERSION", "0.0.0.dev0+local") %}
 {% set build_string = environ.get("CNERY_BUILD_STRING", "local") %}
+{# Bump when this recipe changes without the upstream commit changing -- a dependency pin, say.
+   Version and build_string both derive from the upstream SHA, so without this in the build
+   string a recipe-only rebuild would produce a filename already in the channel, and
+   publish_channel.sh would decline to overwrite it. #}
+{% set build_number = 1 %}
 
 package:
   name: cnery-prerelease
@@ -12,8 +17,8 @@ source:
   git_depth: -1
 
 build:
-  number: 0
-  string: {{ build_string }}
+  number: {{ build_number }}
+  string: {{ build_string }}_{{ build_number }}
   noarch: python
   script: {{ PYTHON }} -m pip install --no-deps --no-build-isolation -v .
   script_env:
