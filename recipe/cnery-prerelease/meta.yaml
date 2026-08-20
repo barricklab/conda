@@ -26,10 +26,10 @@ requirements:
     - setuptools >=68.2.0
   run:
     - python >=3.9
-    - pandas >=2.2.0,<3
+    - pandas >=2.2.0
     - numpy >=1.26.0
     - matplotlib >=3.8.0
-    - statsmodels >=0.14.0
+    - statsmodels >=0.14.6
     - scipy >=1.12.0
     - seaborn >=0.13.0
 
