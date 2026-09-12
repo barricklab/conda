@@ -37,10 +37,10 @@ while IFS=$'\t' read -r subdir pkg; do
   # Cross-check that what was built carries the version the check job derived,
   # so an env-var regression cannot publish a silently mislabelled package.
   if [[ "${BRESEQ_BUILT:-false}" == "true" && "${name}" == breseq-prerelease-* ]]; then
-    if [[ "${name}" == "breseq-prerelease-${BRESEQ_VERSION}-${BRESEQ_BUILD_STRING}.conda" ]]; then
+    if [[ "${name}" == "breseq-prerelease-${BRESEQ_VERSION}-${BRESEQ_BUILD_STRING}_"*.conda ]]; then
       breseq_found=$((breseq_found + 1))
     else
-      echo "UNEXPECTED VERSION: ${name} (wanted breseq-prerelease-${BRESEQ_VERSION}-${BRESEQ_BUILD_STRING}.conda)" >&2
+      echo "UNEXPECTED VERSION: ${name} (wanted breseq-prerelease-${BRESEQ_VERSION}-${BRESEQ_BUILD_STRING}_<n>.conda)" >&2
       exit 1
     fi
   fi
