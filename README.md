@@ -15,6 +15,29 @@ here are built straight from breseq's `master` branch and may be broken or
 unstable; use them to test in-development changes, not for production
 analysis.
 
+## macOS builds of Linux-only bioconda tools
+
+`recipe/vg/` (vg 1.63.1) and `recipe/centrifuge/` (Centrifuge 1.0.4.2) build tools that bioconda
+ships for Linux only, for `osx-arm64` (and optionally `osx-64`). They are fixed upstream releases
+with patches for current macOS toolchains, used by the
+[Ecoli_inGEST](https://github.com/NCEMS/bacterial_states) workflow. Put this channel before
+bioconda; Linux installs keep getting both tools from bioconda:
+
+```
+mamba create -n tools -c https://barricklab.github.io/conda/ -c conda-forge -c bioconda vg=1.63.1 centrifuge
+```
+
+These are built by `.github/workflows/build-macos-tools.yml`, which only runs when triggered by
+hand (there is no upstream commit to poll):
+
+```
+gh workflow run build-macos-tools.yml -f recipes="vg centrifuge"            # osx-arm64
+gh workflow run build-macos-tools.yml -f recipes="vg" -f include_osx64=true  # plus Intel Macs
+```
+
+Bump `build.number` in a recipe's `meta.yaml` when changing only the recipe; `publish_channel.sh`
+never overwrites a published filename.
+
 ## How it works
 
 - `recipe/breseq-prerelease/` is a conda-build recipe that builds breseq from

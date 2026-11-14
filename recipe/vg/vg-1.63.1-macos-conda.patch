@@ -1,0 +1,166 @@
+--- deps/atomic_queue/include/atomic_queue/atomic_queue.h
++++ deps/atomic_queue/include/atomic_queue/atomic_queue.h
+@@ -391,13 +391,13 @@
+ 
+     T do_pop(unsigned tail) noexcept {
+         unsigned index = details::remap_index<SHUFFLE_BITS>(tail % size_);
+-        return Base::template do_pop_any(states_[index], elements_[index]);
++        return Base::do_pop_any(states_[index], elements_[index]);
+     }
+ 
+     template<class U>
+     void do_push(U&& element, unsigned head) noexcept {
+         unsigned index = details::remap_index<SHUFFLE_BITS>(head % size_);
+-        Base::template do_push_any(std::forward<U>(element), states_[index], elements_[index]);
++        Base::do_push_any(std::forward<U>(element), states_[index], elements_[index]);
+     }
+ 
+ public:
+@@ -519,13 +519,13 @@
+ 
+     T do_pop(unsigned tail) noexcept {
+         unsigned index = details::remap_index<SHUFFLE_BITS>(tail & (size_ - 1));
+-        return Base::template do_pop_any(states_[index], elements_[index]);
++        return Base::do_pop_any(states_[index], elements_[index]);
+     }
+ 
+     template<class U>
+     void do_push(U&& element, unsigned head) noexcept {
+         unsigned index = details::remap_index<SHUFFLE_BITS>(head & (size_ - 1));
+-        Base::template do_push_any(std::forward<U>(element), states_[index], elements_[index]);
++        Base::do_push_any(std::forward<U>(element), states_[index], elements_[index]);
+     }
+ 
+ public:
+--- deps/libbdsg/Makefile
++++ deps/libbdsg/Makefile
+@@ -70,11 +70,13 @@
+ # Use static pattern rules so the dependency files will not be ignored if the output exists
+ # See <https://stackoverflow.com/a/34983297>
+ $(OBJS): $(OBJ_DIR)/%.o : $(SRC_DIR)/%.cpp $(OBJ_DIR)/%.d
++	@mkdir -p $(OBJ_DIR)
+ 	$(CXX) $(LDFLAGS) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+ 	@touch $@
+ 
+ 
+ $(LIB_DIR)/libbdsg.a: $(OBJS)
++	@mkdir -p $(LIB_DIR)
+ 	rm -f $@
+ 	ar rs $@ $(OBJS)
+ 
+--- deps/sdsl-lite/include/sdsl/louds_tree.hpp
++++ deps/sdsl-lite/include/sdsl/louds_tree.hpp
+@@ -179,8 +179,8 @@
+ 
+         void swap(louds_tree& tree) {
+             m_bv.swap(tree.m_bv);
+-            util::swap_support(m_bv_select1, tree.m_select1, &m_bv, &(tree.m_bv));
+-            util::swap_support(m_bv_select0, tree.m_select0, &m_bv, &(tree.m_bv));
++            util::swap_support(m_bv_select1, tree.m_bv_select1, &m_bv, &(tree.m_bv));
++            util::swap_support(m_bv_select0, tree.m_bv_select0, &m_bv, &(tree.m_bv));
+         }
+ 
+         size_type serialize(std::ostream& out, structure_tree_node* v=nullptr, std::string name="")const {
+--- Makefile
++++ Makefile
+@@ -105,6 +105,8 @@
+     # Homebrew installs a Protobuf that uses an Abseil that is built with C++17, so we need to build with at least C++17
+     CXX_STANDARD?=17
+ 
++    # NO_SYSTEM_PREFIXES=1 (e.g. for conda builds) skips probing /opt/local and /usr/local.
++    ifndef NO_SYSTEM_PREFIXES
+     # We may need libraries from Macports
+     ifeq ($(shell if [ -d /opt/local/lib ];then echo 1;else echo 0;fi), 1)
+         # Use /opt/local/lib if present when building dependencies
+@@ -126,6 +128,7 @@
+             LD_LIB_FLAGS += -lcairo
+         endif
+     endif
++    endif
+ 
+     ifndef HOMEBREW_PREFIX
+         BREW_PATH=$(shell which brew 2>/dev/null)
+@@ -147,7 +150,7 @@
+ 	# -lboost_program_options, except for on Macports installs of Boost where
+ 	# it is -lboost_program_options-mt. If we were a real build system we would
+ 	# try things until it worked. Instead, we guess.
+-    ifeq ($(shell if [ -f /opt/local/lib/libboost_program_options-mt.dylib ];then echo 1;else echo 0;fi), 1)
++    ifeq ($(if $(NO_SYSTEM_PREFIXES),0,$(shell if [ -f /opt/local/lib/libboost_program_options-mt.dylib ];then echo 1;else echo 0;fi)), 1)
+         # This is where Macports puts it, so use that name
+ 		BOOST_SUFFIX="-mt"
+     endif
+@@ -208,8 +211,13 @@
+     # more restrictive we can have trouble inlining parts of the standard
+     # library that were built for something less restrictive. However,
+     # Apple Clang does not recognize -march=native on ARM.
++	# VG_PORTABLE=1 (e.g. for conda packages) targets SSE4.2 like the Linux builds instead of the build machine.
+ 	ifeq ($(shell uname -m), x86_64)
+-		CXXFLAGS += -march=native
++		ifdef VG_PORTABLE
++			CXXFLAGS += -msse4.2
++		else
++			CXXFLAGS += -march=native
++		endif
+ 	endif
+ 
+     # Note shared libraries are dylibs
+--- src/multipath_alignment_graph.cpp
++++ src/multipath_alignment_graph.cpp
+@@ -6445,7 +6445,7 @@
+         for (const auto& path_node : path_nodes) {
+             for (const auto& edge : path_node.edges) {
+                 const auto& next_node = path_nodes[edge.first];
+-                shift = max<size_t>(shift, abs<int64_t>((next_node.begin - path_node.end) - edge.second));
++                shift = max<size_t>(shift, std::llabs((next_node.begin - path_node.end) - edge.second));
+             }
+         }
+         return shift;
+@@ -6469,7 +6469,7 @@
+                     ++in_degree[edge.first];
+                     
+                     const auto& next_node = path_nodes[edge.first];
+-                    size_t shift = abs<int64_t>((next_node.begin - path_node.end) - edge.second);
++                    size_t shift = std::llabs((next_node.begin - path_node.end) - edge.second);
+                     
+ #ifdef debug_shift_pruning
+                     cerr << "shift DP reverse " << i << " <- " << edge.first << " with shift " << shift << " for total " << min_shift_rev[edge.first] + shift << endl;
+@@ -6495,7 +6495,7 @@
+             else {
+                 for (auto& edge : path_node.edges) {
+                     const auto& next_node = path_nodes[edge.first];
+-                    size_t shift = abs<int64_t>((next_node.begin - path_node.end) - edge.second);
++                    size_t shift = std::llabs((next_node.begin - path_node.end) - edge.second);
+ #ifdef debug_shift_pruning
+                     cerr << "shift DP forward " << i << " -> " << edge.first << " with shift " << shift << " for total " << min_shift_fwd[i] + shift << endl;
+ #endif
+@@ -6517,7 +6517,7 @@
+             for (size_t j = 0; j < path_node.edges.size(); ++j) {
+                 auto& edge = path_node.edges[j];
+                 const auto& next_node = path_nodes[edge.first];
+-                size_t shift = abs<int64_t>((next_node.begin - path_node.end) - edge.second);
++                size_t shift = std::llabs((next_node.begin - path_node.end) - edge.second);
+                 
+                 size_t min_edge_shift = min_shift_fwd[i] + shift + min_shift_rev[edge.first];
+                 
+--- src/multipath_mapper.cpp
++++ src/multipath_mapper.cpp
+@@ -2448,7 +2448,7 @@
+                     // in the left_idxs and right_idxs vectors
+                     int64_t target_len = 2 * seq_len - left_side.clip_length - right_side.clip_length;
+                     auto distance_diff = [&](size_t l, size_t r) {
+-                        return abs<int64_t>(get<2>(left_sites[left_idxs[l]]) + get<2>(right_sites[right_idxs[r]]) - target_len);
++                        return std::llabs(get<2>(left_sites[left_idxs[l]]) + get<2>(right_sites[right_idxs[r]]) - target_len);
+                     };
+                     
+                     // sweep to identify pairs that most nearly align
+--- src/subcommand/gampcompare_main.cpp
++++ src/subcommand/gampcompare_main.cpp
+@@ -218,7 +218,7 @@
+                             if (path_true_positions[i].second == path_mapped_positions[j].second) {
+                                 // there is a pair of positions on the same strand of the same path
+                                 abs_dist = min<int64_t>(abs_dist,
+-                                                        abs<int64_t>(path_true_positions[i].first - path_mapped_positions[j].first));
++                                                        std::llabs(path_true_positions[i].first - path_mapped_positions[j].first));
+                             }
+                         }
+                     }

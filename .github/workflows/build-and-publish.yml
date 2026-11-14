@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: publish-gh-pages   # shared with build-macos-tools.yml: one gh-pages push at a time
   cancel-in-progress: false
 
 jobs:

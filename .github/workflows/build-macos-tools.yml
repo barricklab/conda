@@ -1,0 +1,135 @@
+name: Build and publish macOS tool packages
+
+# macOS builds of tools that bioconda only ships for Linux (vg, centrifuge). Each recipe in
+# recipe/<name>/ builds from a fixed upstream release, so there is nothing to poll: run this by
+# hand after adding or changing a recipe (bump build.number in meta.yaml for a recipe-only
+# change, or publish_channel.sh will skip the already-published filename).
+#
+#   gh workflow run build-macos-tools.yml -f recipes="vg centrifuge"
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipes:
+        description: 'Space-separated recipe directories under recipe/ to build'
+        type: string
+        default: 'vg centrifuge'
+      include_osx64:
+        description: 'Also build for Intel Macs (osx-64)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# Shared with the prerelease workflow so two runs never push gh-pages at the same time.
+concurrency:
+  group: publish-gh-pages
+  cancel-in-progress: false
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          RECIPES: ${{ inputs.recipes }}
+          OSX64: ${{ inputs.include_osx64 }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os
+          platforms = [{"os": "macos-15", "subdir": "osx-arm64"}]
+          if os.environ["OSX64"] == "true":
+              platforms.append({"os": "macos-15-intel", "subdir": "osx-64"})
+          include = [dict(p, recipe=r) for r in os.environ["RECIPES"].split() for p in platforms]
+          print("matrix=" + json.dumps({"include": include}))
+          EOF
+
+  build:
+    needs: matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          channels: conda-forge,bioconda
+          channel-priority: strict
+          auto-activate-base: true
+
+      - name: Install conda-build
+        shell: bash -el {0}
+        run: conda install -y -n base conda-build conda-index
+
+      - name: Build ${{ matrix.recipe }} (${{ matrix.subdir }})
+        shell: bash -el {0}
+        run: |
+          conda build recipe/${{ matrix.recipe }} \
+            -c conda-forge -c bioconda \
+            --output-folder ./built-pkgs
+
+      # Wildcard directory component: see the note in build-and-publish.yml.
+      - name: Upload built package
+        uses: actions/upload-artifact@v7
+        with:
+          name: pkg-${{ matrix.recipe }}-${{ matrix.subdir }}
+          path: built-pkgs/*/*.conda
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: pkg-*
+          path: downloaded-pkgs
+
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          channels: conda-forge
+          activate-environment: index-env
+
+      - name: Install conda-index
+        shell: bash -el {0}
+        run: conda install -y conda-index
+
+      - name: Checkout gh-pages into ./channel
+        run: |
+          git fetch origin gh-pages
+          git worktree add channel gh-pages
+
+      - name: Merge new packages into channel (without deleting existing)
+        shell: bash -el {0}
+        run: bash scripts/publish_channel.sh
+
+      - name: Verify the built packages landed in channel
+        shell: bash -el {0}
+        run: bash scripts/verify_channel.sh
+
+      - name: conda index
+        shell: bash -el {0}
+        run: python -m conda_index channel/
+
+      - name: Commit and push gh-pages
+        working-directory: channel
+        env:
+          RECIPES: ${{ inputs.recipes }}
+        run: |
+          touch .nojekyll
+          git add -A
+          git -c user.name="barricklab-conda-bot" \
+              -c user.email="actions@github.com" \
+              commit -m "Publish macOS packages: ${RECIPES}"
+          git push origin gh-pages
