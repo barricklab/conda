@@ -1,0 +1,79 @@
+{% set name = "vg" %}
+{% set version = "1.63.1" %}
+
+# macOS build of vg from source. Linux users get vg from bioconda, whose recipe repackages
+# vgteam's static Linux release binaries (vgteam publishes no macOS binary). Built against
+# conda-forge libraries only (no Homebrew). See build.sh and the patch for what had to change.
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  url: https://github.com/vgteam/vg/releases/download/v{{ version }}/vg-v{{ version }}.tar.gz
+  sha256: fa44b5812cc260b98cbafc9bd58e3e0a3642d031afe2c4b533dadc8cf80d5854
+  patches:
+    # Makefile: NO_SYSTEM_PREFIXES / VG_PORTABLE switches; fixes for clang >= 19, libc++ >= 19
+    # and GNU make >= 4.4 in sdsl-lite, atomic_queue, libbdsg and three vg sources.
+    - vg-1.63.1-macos-conda.patch
+
+build:
+  number: 0
+  skip: true  # [not osx]
+  run_exports:
+    - {{ pin_subpackage('vg', max_pin="x") }}
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+    - make
+    - cmake
+    - pkg-config
+    - autoconf
+    - automake
+    - libtool
+    - bison
+    - flex
+    - m4
+    - coreutils
+    - sed
+    - gawk
+    - perl >=5.32
+    - python >=3.10
+    - git
+    - libprotobuf 5.29.*      # protoc for libvgio
+  host:
+    - llvm-openmp
+    # libvgio in vg 1.63.1 needs the protobuf < 30 API (descriptor names as std::string)
+    - libprotobuf 5.29.*
+    - jansson
+    - libboost-devel
+    - zstd
+    - lz4-c
+    - xz
+    - bzip2
+    - zlib
+    - cairo
+    - freetype
+    - expat
+    - libintl-devel
+    - ncurses
+    - pybind11
+
+test:
+  commands:
+    - vg version
+    # vg's own Catch unit tests (685 test cases, ~1 min)
+    - vg test
+
+about:
+  home: https://github.com/vgteam/vg
+  license: MIT
+  license_family: MIT
+  license_file: LICENSE
+  summary: Variation graph data structures, interchange formats, alignment, genotyping, and variant calling methods
+  description: |
+    macOS build of vg from the release source tarball, linked against conda-forge libraries.
+    vg's bundled dependencies (libvgio, libhandlegraph, htslib, libdeflate, ...) are linked
+    statically so they do not clash with conda packages of the same libraries.
