@@ -27,6 +27,20 @@ export CFLAGS CXXFLAGS CPPFLAGS
 
 MAKE_ARGS=(NO_SYSTEM_PREFIXES=1 VG_PORTABLE=1)
 
+# On Intel, many bundled dependencies (sdsl-lite, DYNAMIC, dozeu, ips4o, atomic_queue, gfakluge)
+# hard-code -march=native, which would tie the package to the build runner's CPU (AVX2/AVX-512).
+# Target SSE4.2 + POPCNT like vgteam's Linux binaries. (arm64 has a single baseline, so leave it.)
+if [[ "$(uname -m)" == "x86_64" ]]; then
+    # (grep exits 1 for a batch without matches; that is not an error here)
+    native_files=$(find deps \( -name CMakeLists.txt -o -name Makefile -o -name '*.cmake' -o -name '*.mk' \) \
+        -type f -exec grep -lE -- '-m(arch|tune)=native' {} + || true)
+    for f in ${native_files}; do
+        sed -i.bak -e 's/-march=native/-msse4.2 -mpopcnt/g' -e 's/-mtune=native//g' "${f}"
+        rm -f "${f}.bak"
+        echo "removed -march/-mtune=native from ${f}"
+    done
+fi
+
 make "${MAKE_ARGS[@]}" -j"${CPU_COUNT}"
 
 # The bundled libraries are built both as .a and .dylib, and the dylibs are needed while
@@ -43,6 +57,15 @@ if otool -L bin/vg | grep -q "${SRC_DIR}"; then
     otool -L bin/vg
     echo "bin/vg links against libraries in the build directory" >&2
     exit 1
+fi
+
+# Report wide-vector instructions. Some are expected (htslib and libdeflate pick AVX2/AVX-512
+# code paths at run time); a large count would point at a dependency still built for the runner.
+if [[ "$(uname -m)" == "x86_64" ]]; then
+    otool -tv bin/vg > vg.disasm
+    echo "instructions using ymm registers: $(grep -c '%ymm' vg.disasm || true)"
+    echo "instructions using zmm registers: $(grep -c '%zmm' vg.disasm || true)"
+    rm -f vg.disasm
 fi
 
 install -d "${PREFIX}/bin"
