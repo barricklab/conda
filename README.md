@@ -18,8 +18,9 @@ analysis.
 ## macOS builds of Linux-only bioconda tools
 
 `recipe/vg/` (vg 1.63.1) and `recipe/centrifuge/` (Centrifuge 1.0.4.2) build tools that bioconda
-ships for Linux only, for `osx-arm64` (and optionally `osx-64`). They are fixed upstream releases
-with patches for current macOS toolchains, used by the
+ships for Linux only, for `osx-arm64` and `osx-64` (Intel Macs: macOS 10.15 or later, built for
+SSE4.2 like vgteam's Linux binaries, not for the build runner's CPU). They are fixed upstream
+releases with patches for current macOS toolchains, used by the
 [Ecoli_inGEST](https://github.com/NCEMS/bacterial_states) workflow. Put this channel before
 bioconda; Linux installs keep getting both tools from bioconda:
 
