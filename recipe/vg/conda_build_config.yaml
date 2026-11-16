@@ -3,3 +3,6 @@ c_compiler_version:
   - 21
 cxx_compiler_version:
   - 21
+# Intel: conda-build's default deployment target is older than what vg's C++17 code needs.
+MACOSX_DEPLOYMENT_TARGET:  # [osx and x86_64]
+  - "10.15"                # [osx and x86_64]
